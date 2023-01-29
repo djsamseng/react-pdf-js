@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as pdfjs from 'pdfjs-dist';
 import { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import { DocumentInitParameters } from 'pdfjs-dist/types/src/display/api';
+import { DocumentInitParameters, BinaryData } from 'pdfjs-dist/types/src/display/api';
 
 function isFunction(value: any): value is Function {
   return typeof value === 'function';
@@ -11,13 +11,15 @@ type PDFRenderTask = ReturnType<PDFPageProxy['render']>;
 
 type HookProps = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  file: string;
+  file?: string;
+  pdfData?: BinaryData;
   onDocumentLoadSuccess?: (document: PDFDocumentProxy) => void;
   onDocumentLoadFail?: () => void;
   onPageLoadSuccess?: (page: PDFPageProxy) => void;
   onPageLoadFail?: () => void;
   onPageRenderSuccess?: (page: PDFPageProxy) => void;
   onPageRenderFail?: () => void;
+  onPageRenderStart?: () => void;
   scale?: number;
   rotate?: number;
   page?: number;
@@ -35,12 +37,14 @@ type HookReturnValues = {
 export const usePdf = ({
   canvasRef,
   file,
+  pdfData,
   onDocumentLoadSuccess,
   onDocumentLoadFail,
   onPageLoadSuccess,
   onPageLoadFail,
   onPageRenderSuccess,
   onPageRenderFail,
+  onPageRenderStart,
   scale = 1,
   rotate = 0,
   page = 1,
@@ -59,6 +63,7 @@ export const usePdf = ({
   const onPageLoadFailRef = useRef(onPageLoadFail);
   const onPageRenderSuccessRef = useRef(onPageRenderSuccess);
   const onPageRenderFailRef = useRef(onPageRenderFail);
+  const onPageRenderStartRef = useRef(onPageRenderStart);
 
   // assign callbacks to refs to avoid redrawing
   useEffect(() => {
@@ -86,14 +91,24 @@ export const usePdf = ({
   }, [onPageRenderFail]);
 
   useEffect(() => {
+    onPageRenderStartRef.current = onPageRenderStart;
+  }, [onPageRenderStart]);
+
+  useEffect(() => {
     pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
   }, [workerSrc]);
 
   useEffect(() => {
-    const config: DocumentInitParameters = { url: file, withCredentials };
+    const config: DocumentInitParameters = { withCredentials };
     if (cMapUrl) {
       config.cMapUrl = cMapUrl;
       config.cMapPacked = cMapPacked;
+    }
+    if (file) {
+      config.url = file;
+    }
+    else if (pdfData) {
+      config.data = pdfData;
     }
 
     pdfjs.getDocument(config).promise.then(
@@ -141,6 +156,10 @@ export const usePdf = ({
         lastPageRequestedRenderRef.current = page;
         renderTask.current.cancel();
         return;
+      }
+
+      if (isFunction(onPageRenderStartRef.current)) {
+        onPageRenderStartRef.current();
       }
 
       renderTask.current = page.render({
