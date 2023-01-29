@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePdf } from '@mikecousins/react-pdf';
 import {
   ArrowLeftCircleIcon,
@@ -9,13 +9,25 @@ import clsx from 'clsx';
 
 function App() {
   const [page, setPage] = useState(1);
-  const canvasRef = useRef(null);
+  useEffect(() => {
+    for (let i = 0; i < 8; i++) {
+      const pgNum = (i % 2) + 8;
 
+      setTimeout(() => {
+        setPage(pgNum);
+      }, i * 100);
+    }
+  }, []);
+  console.log("Set page:", page);
+  const canvasRef = useRef(null);
   const { pdfDocument } = usePdf({
-    file: 'udm_se_ds.pdf',
+    file: 'plan.pdf',
     page,
     canvasRef,
-    scale: 0.4,
+    scale: 1.5,
+    onPageRenderSuccess: page => {
+      console.log("Render success:", page.pageNumber);
+    }
   });
 
   const previousDisabled = page === 1;
